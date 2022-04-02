@@ -27,11 +27,11 @@ class KanbanTxtViewer:
 
     THEMES = {
         'LIGHT_COLORS' : {
-            "Todo": '#f27272',
+            "To Do": '#f27272',
             "In progress": '#00b6e4',
             "Validation": '#22b57f',
             "Done": "#8BC34A",
-            "Todo-column": '#daecf1',
+            "To Do-column": '#daecf1',
             "In progress-column": '#daecf1',
             "Validation-column": '#daecf1',
             "Done-column": "#daecf1",
@@ -48,11 +48,11 @@ class KanbanTxtViewer:
         },
 
         'DARK_COLORS' : {
-            "Todo": '#f27272',
+            "To Do": '#f27272',
             "In progress": '#00b6e4',
             "Validation": '#22b57f',
             "Done": "#8BC34A",
-            "Todo-column": '#15151f',
+            "To Do-column": '#15151f',
             "In progress-column": '#15151f',
             "Validation-column": '#15151f',
             "Done-column": "#15151f",
@@ -80,7 +80,7 @@ class KanbanTxtViewer:
         self.current_date = date.today()
         
         self.ui_columns = {
-            "Todo": [],
+            "To Do": [],
             "In progress": [],
             "Validation": [],
             "Done": []
@@ -239,7 +239,7 @@ class KanbanTxtViewer:
         self.create_button(
             editor_toolbar, 
             '✅→⚫', 
-            self.COLORS['Todo'], 
+            self.COLORS['To Do'], 
             command=self.move_to_todo
         ).grid(row=0, sticky='ew', column=0, padx=5, pady=5)
 
@@ -503,7 +503,7 @@ class KanbanTxtViewer:
     def parse_todo_txt(self, p_todo_txt):
         """Parse a todo txt content and return data as a dictionary"""
         tasks = {
-            "Todo": [],
+            "To Do": [],
             "In progress": [],
             "Validation": [],
             "Done": []
@@ -517,7 +517,7 @@ class KanbanTxtViewer:
             for widget in ui_column.content.winfo_children():
                 widget.destroy()
 
-        important_frame = tk.Frame(self.ui_columns['Todo'].content, bg=ui_column.content['bg'])    
+        important_frame = tk.Frame(self.ui_columns['To Do'].content, bg=ui_column.content['bg'])    
         important_frame.pack(side='top', fill='x')
 
         todo_list = p_todo_txt.split("\n")
@@ -536,7 +536,7 @@ class KanbanTxtViewer:
                 task = task_data.groupdict()
                 task['is_important'] = False
 
-                category = "Todo"
+                category = "To Do"
 
                 if task.get("isDone"):
                     category = "Done"
@@ -594,11 +594,11 @@ class KanbanTxtViewer:
                     name="task#" + str(index + 1)
                 )
 
-        tasks['Todo'] = important_tasks + tasks['Todo']
+        tasks['To Do'] = important_tasks + tasks['To Do']
 
         # Compute proportion for each column tasks and update progress bars
         tasks_number = {
-            'Todo': len(tasks["Todo"]),
+            'To Do': len(tasks["To Do"]),
             'In progress': len(tasks['In progress']),
             'Validation': len(tasks['Validation']),
             'Done': len(tasks['Done'])
@@ -610,7 +610,7 @@ class KanbanTxtViewer:
 
         if total_tasks > 0:
             percentages = {
-                'Todo': tasks_number['Todo'] / total_tasks,
+                'To Do': tasks_number['To Do'] / total_tasks,
                 'In progress': tasks_number['In progress'] / total_tasks,
                 'Validation': tasks_number['Validation'] / total_tasks,
                 'Done': tasks_number['Done'] / total_tasks
@@ -649,7 +649,7 @@ class KanbanTxtViewer:
         context=None, 
         start_date=None,
         end_date=None,
-        state='Todo',
+        state='To Do',
         name=""
     ):
         # Create the card frame
