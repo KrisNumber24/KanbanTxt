@@ -887,6 +887,9 @@ class KanbanTxtViewer:
 
     def scroll(self, event):
         """Scroll through the kanban frame"""
+        if self.content_canvas.winfo_height() > self.canvas_frame.winfo_height():
+            return
+
         self.content_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
 
