@@ -660,7 +660,7 @@ class KanbanTxtViewer:
 
         self.main_window.update()
 
-        return tasks;
+        return tasks
 
 
     def draw_card(
