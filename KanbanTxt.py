@@ -71,6 +71,8 @@ class KanbanTxtViewer:
 
     FONTS = []
 
+    project_tasks = {}
+
 
     def __init__(self, file='', darkmode=False) -> None:
         self.darkmode = darkmode
@@ -579,6 +581,29 @@ class KanbanTxtViewer:
                 card_parent = self.ui_columns[category].content
                 if task.get('is_important', False):
                     card_parent = important_frame
+                
+                # register the task in the projects dictionary
+                if task.get('project'):
+                    project = task.get('project')
+                    if not self.project_tasks.get(project):
+                        self.project_tasks[project] = []
+
+                    self.project_tasks[project].append(
+                        {
+                            'parent': card_parent,
+                            'subject': task.get('subject', '???'),
+                            'background': card_bg,
+                            'font': font,
+                            'is_important': task['is_important'],
+                            'project': project, 
+                            'context': task.get('context'),
+                            'start_date': start_date,
+                            'end_date': end_date,
+                            'category': category,
+                            'name': "task#" + str(index + 1)
+                        }
+                    )
+
 
                 self.draw_card(
                     card_parent,
