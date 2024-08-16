@@ -73,6 +73,9 @@ class KanbanTxtViewer:
 
     project_tasks = {}
 
+    win_height = 0
+    win_width = 0
+
 
     def __init__(self, file='', darkmode=False) -> None:
         self.darkmode = darkmode
@@ -978,6 +981,12 @@ class KanbanTxtViewer:
     
 
     def on_window_resize(self, event):
+        if self.win_width == event.width and self.win_height == event.height:
+            return
+
+        self.win_width = event.width
+        self.win_height = event.height
+
         self.hide_content()
         
         if self._after_id:
