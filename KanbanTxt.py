@@ -384,10 +384,71 @@ class KanbanTxtViewer:
 
         # END SCROLLABLE CANVAS
 
+
+        # Prepare filters panel
+        self.filters_panel = tk.Frame(
+            self.content_frame, 
+            bg=self.COLORS['main-background'], 
+            highlightbackground=self.COLORS['main-text'], 
+            highlightthickness=2
+        )
+        self.filters_panel.columnconfigure(0, weight=1)
+        self.filters_panel.columnconfigure(1, weight=1)
+
+        filters_title = tk.Label(
+            self.filters_panel, 
+            text="Filters", 
+            font=tkFont.nametofont('h2'),
+            fg=self.COLORS['main-text'],
+            bg=self.COLORS['main-background'],
+            anchor=tk.W
+        )
+        filters_title.grid(column=0, row=0, columnspan=2, sticky='we')
+
+        self.toggle_filters_button = tk.Button(
+            filters_title, 
+            text='▼', 
+            fg=self.COLORS['main-text'],
+            bg=self.COLORS['main-background'],
+            relief='flat',
+            borderwidth=0,
+            activebackground=self.COLORS['done-card-background'],
+            activeforeground=self.COLORS['main-text'],
+            font=tkFont.nametofont('main')
+            )
+        self.toggle_filters_button.pack(side='right', padx=5, pady=5)
+
+        project_filters_title = tk.Label(
+            self.filters_panel,
+            font=tkFont.nametofont("main"),
+            fg=self.COLORS['project'],
+            bg=self.COLORS['done-card-background'],
+            text="+projects"
+        )
+        project_filters_title.grid(column=0, row=1)
+
+        self.project_filters_list = tk.Listbox(
+            self.filters_panel,
+            bg=self.COLORS['done-card-background'],
+            fg=self.COLORS['main-text'],
+            font=tkFont.nametofont('main'),
+            selectmode='multiple',
+            selectbackground=self.COLORS['project'],
+            selectforeground=self.COLORS['main-background'],
+            selectborderwidth=0,
+            border=0,
+            highlightthickness=0
+        )
+        self.project_filters_list.grid(
+            column=0, row=2, pady=5
+        )
+
         # Prepare progress bars and kanban itself
         self.progress_bar = tk.Frame(self.content_frame, height=15, bg=self.COLORS['done-card-background'])
         self.progress_bar.pack(side='top', fill='x', padx=10, pady=10)
         self.progress_bars = {}
+
+        self.filters_panel.pack(fill='x', padx=10, pady=10)
 
         # scrollable frame is packed here to be under the progress bar 
         self.scrollable_frame.pack(fill='both', expand=True)
@@ -527,6 +588,9 @@ class KanbanTxtViewer:
 
         important_tasks = []
 
+        # reset the task lists filtered by projects
+        self.project_tasks = {}
+
         # Erase the columns content
         for ui_column_name, ui_column in self.ui_columns.items():
             ui_column.content.pack_forget()
@@ -599,8 +663,11 @@ class KanbanTxtViewer:
                 # register the task in the projects dictionary
                 if task.get('project'):
                     project = task.get('project')
+
                     if not self.project_tasks.get(project):
                         self.project_tasks[project] = []
+                        self.project_filters_list.insert(tk.END, project)
+
 
                     self.project_tasks[project].append(
                         {
