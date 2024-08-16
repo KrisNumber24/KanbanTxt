@@ -336,37 +336,49 @@ class KanbanTxtViewer:
 
     def draw_content_frame(self):
         # Create content view that will display kanban
+        self.content_frame = tk.Frame(self.main_window, bg=self.COLORS['main-background'])
+        self.content_frame.grid(row=0, column=1, sticky=tk.NSEW, padx=10, pady=10)
+        
+        # Give more space to the kanban view
+        self.main_window.grid_columnconfigure(1, weight=6)
 
+        
         # SCROLLABLE CANVAS
+        self.scrollable_frame = tk.Frame(self.content_frame, bg=self.COLORS['main-background'])
+
+        scrollbar = tk.Scrollbar(
+            self.scrollable_frame, 
+            orient="vertical", 
+        )
+        scrollbar.grid(column=1, row=0, sticky='ns')
+
         # Use canvas to make content view scrollable
         self.content_canvas = tk.Canvas(
-            self.main_window, 
+            self.scrollable_frame, 
             bg=self.COLORS['main-background'], 
             bd=0, 
             highlightthickness=0, 
             relief=tk.FLAT
         )
-        self.content_canvas.grid(row=0, column=1, sticky=tk.NSEW, padx=10, pady=10)
-        
-        # Give more space to the kanban view
-        self.main_window.grid_columnconfigure(1, weight=6)
+        self.content_canvas.grid(column=0, row=0, sticky='nsew')
 
         # The frame inside the canvas. It manage the widget displayed inside the canvas
-        self.content_frame = tk.Frame(self.content_canvas, bg=self.COLORS['main-background'])
+        self.canvas_frame = tk.Frame(self.scrollable_frame, bg=self.COLORS['main-background'])
 
+        # Frame containing the kanban
+        self.kanban_frame = tk.Frame(self.canvas_frame, bg=self.COLORS['main-background'])
+        self.kanban_frame.pack(fill='x')
 
-        content_scrollbar = tk.Scrollbar(
-            self.main_window, 
-            orient="vertical", 
-            command=self.content_canvas.yview
-        )
-        content_scrollbar.grid(row=0, column=2, sticky='ns')
-        
-        self.canvas_frame = self.content_canvas.create_window(
-            (0, 0), window=self.content_frame, anchor="nw")
+        self.canvas_frame_id = self.content_canvas.create_window(
+            (0, 0), window=self.canvas_frame, anchor="nw")
 
         # Attach the scroll bar position to the visible region of the canvas
-        self.content_canvas.configure(yscrollcommand=content_scrollbar.set)
+        self.scrollable_frame.grid_rowconfigure(0, weight=1)
+        self.scrollable_frame.grid_columnconfigure(0, weight=1)
+        scrollbar.configure(command=self.content_canvas.yview)
+        self.content_canvas.configure(yscrollcommand=scrollbar.set)
+        self.canvas_frame.configure()
+
         # END SCROLLABLE CANVAS
 
         # Prepare progress bars and kanban itself
@@ -374,14 +386,13 @@ class KanbanTxtViewer:
         self.progress_bar.pack(side='top', fill='x', padx=10, pady=10)
         self.progress_bars = {}
 
+        # scrollable frame is packed here to be under the progress bar 
+        self.scrollable_frame.pack(fill='both', expand=True)
+
         # position of the current sub progress bar
         sub_bar_pos = 0
         # number of the current column in the tkinter grid
         column_number = 0
-
-        # Frame containing the kanban
-        self.kanban_frame = tk.Frame(self.content_frame, bg=self.COLORS['main-background'])
-        self.kanban_frame.pack(fill='both')
 
         # Create each column and its associated progress bar
         for key, column in self.ui_columns.items():
@@ -447,8 +458,8 @@ class KanbanTxtViewer:
 
         # Allow to bind the mousewheel event to the canvas and scroll through it
         # with the wheel
-        self.content_canvas.bind('<Enter>', self.bind_to_mousewheel)
-        self.content_canvas.bind('<Leave>', self.unbind_to_mousewheel)
+        self.kanban_frame.bind('<Enter>', self.bind_to_mousewheel)
+        self.kanban_frame.bind('<Leave>', self.unbind_to_mousewheel)
 
         # Move the scroll region according to the scroll
         self.content_frame.bind(
@@ -840,13 +851,15 @@ class KanbanTxtViewer:
         self.content_canvas.itemconfig(self.canvas_frame, width = canvas_width)
                 
     def hide_content(self):
-        self.progress_bar.pack_forget()
-        self.kanban_frame.pack_forget()
+        # self.progress_bar.pack_forget()
+        # self.kanban_frame.pack_forget()
+        pass
 
 
     def display_content(self):
-        self.progress_bar.pack(side='top', fill='x', padx=10, pady=10)
-        self.kanban_frame.pack(fill='both')
+        # self.progress_bar.pack(side='top', fill='x', padx=10, pady=10)
+        # self.kanban_frame.pack(fill='both')
+        pass
 
 
     def on_card_width_changed(self, event):
@@ -970,8 +983,9 @@ class KanbanTxtViewer:
         self._after_id = self.main_window.after(100, self.update_canvas, event)
 
 
+
     def update_canvas(self, event):
-        self.content_canvas.itemconfig(self.canvas_frame, width = event.width)
+        self.content_canvas.itemconfig(self.canvas_frame_id, width = event.width)
 
         if event.width < 700:
             index = 1
