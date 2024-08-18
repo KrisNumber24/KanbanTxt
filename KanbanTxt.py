@@ -473,6 +473,8 @@ class KanbanTxtViewer:
         )
         self.project_tasks = self.TaggedTaskList(self.project_filters_list)
 
+        self.project_filters_list.bind('<<ListboxSelect>>', self.on_project_filters_selected)
+
         # Prepare progress bars and kanban itself
         self.progress_bar = tk.Frame(self.content_frame, height=15, bg=self.COLORS['done-card-background'])
         self.progress_bar.pack(side='top', fill='x', padx=10, pady=10)
@@ -709,6 +711,9 @@ class KanbanTxtViewer:
                     project = task.get('project')
 
                     self.project_tasks.push_back_task(project, task_card)
+                
+                else:
+                    self.project_tasks.push_back_task(None, task_card)
 
         tasks['To Do'] = important_tasks + tasks['To Do']
 
@@ -1093,8 +1098,10 @@ class KanbanTxtViewer:
         self.display_content()
         pass
 
+
     def return_pressed(self, event=None):
         self.main_window.after(100, self.update_editor_line_colors)
+
 
     def update_editor_line_colors(self, event=None):
         nb_line = int(self.text_editor.index('end-1c').split('.')[0])
@@ -1109,6 +1116,32 @@ class KanbanTxtViewer:
         searched_task_line = event.widget.winfo_name().replace("task#", "")
         self.text_editor.mark_set('insert', searched_task_line + ".0")
         self.text_editor.see('insert')
+    
+
+    def on_project_filters_selected(self, event):
+        selected_idx = event.widget.curselection()
+
+        if len(selected_idx) == 0:
+            selected_idx = range(0, len(self.project_tasks.tags))
+
+        selected_projects = []
+        for i in selected_idx:
+            selected_projects.append(event.widget.get(i))
+        
+        widgets_to_hide = []
+        widgets_to_show = []
+
+        for key, tasks in self.project_tasks.tagged_tasks.items():
+            if not key in selected_projects:
+                widgets_to_hide += tasks
+            else:
+                widgets_to_show += tasks
+        
+        for widget in widgets_to_hide:
+            widget.pack_forget()
+        
+        for widget in widgets_to_show:
+            widget.pack(padx=0, pady=(0, 10), side="top", fill='x', expand=1, anchor=tk.NW)
 
 
 def main(args):
