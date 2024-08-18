@@ -71,7 +71,36 @@ class KanbanTxtViewer:
 
     FONTS = []
 
-    project_tasks = {}
+    class TaggedTaskList:
+        '''
+        An object that manage a list of tags and stores tasks that have specific
+        tags. It has a listbox attached to it so this widget is updated when a new
+        tag is found or it is needed to reset the tags list.
+        '''
+        attached_listBox = None
+        tags = []
+        tagged_tasks = {}
+
+        def __init__(self, listBox) -> None:
+            self.attached_listBox = listBox
+
+        def create_tag(self, name):
+            if not name in self.tags:
+                self.tags.append(name)
+                self.tagged_tasks[name] = []
+                self.attached_listBox.insert(tk.END, name)
+        
+        def push_back_task(self, tag, task_widget):
+            self.create_tag(tag)
+            self.tagged_tasks[tag].append(task_widget)
+        
+        def clear(self):
+            self.tags.clear()
+            self.tagged_tasks.clear()
+            self.attached_listBox.delete(0, tk.END)
+    
+    project_tasks = None
+
 
     win_height = 0
     win_width = 0
@@ -442,6 +471,7 @@ class KanbanTxtViewer:
         self.project_filters_list.grid(
             column=0, row=2, pady=5
         )
+        self.project_tasks = self.TaggedTaskList(self.project_filters_list)
 
         # Prepare progress bars and kanban itself
         self.progress_bar = tk.Frame(self.content_frame, height=15, bg=self.COLORS['done-card-background'])
@@ -589,7 +619,7 @@ class KanbanTxtViewer:
         important_tasks = []
 
         # reset the task lists filtered by projects
-        self.project_tasks = {}
+        self.project_tasks.clear()
 
         # Erase the columns content
         for ui_column_name, ui_column in self.ui_columns.items():
@@ -659,34 +689,8 @@ class KanbanTxtViewer:
                 card_parent = self.ui_columns[category].content
                 if task.get('is_important', False):
                     card_parent = important_frame
-                
-                # register the task in the projects dictionary
-                if task.get('project'):
-                    project = task.get('project')
 
-                    if not self.project_tasks.get(project):
-                        self.project_tasks[project] = []
-                        self.project_filters_list.insert(tk.END, project)
-
-
-                    self.project_tasks[project].append(
-                        {
-                            'parent': card_parent,
-                            'subject': task.get('subject', '???'),
-                            'background': card_bg,
-                            'font': font,
-                            'is_important': task['is_important'],
-                            'project': project, 
-                            'context': task.get('context'),
-                            'start_date': start_date,
-                            'end_date': end_date,
-                            'category': category,
-                            'name': "task#" + str(index + 1)
-                        }
-                    )
-
-
-                self.draw_card(
+                task_card = self.draw_card(
                     card_parent,
                     task.get('subject', '???'),
                     card_bg,
@@ -699,6 +703,12 @@ class KanbanTxtViewer:
                     state=category,
                     name="task#" + str(index + 1)
                 )
+
+                # register the task in the projects dictionary
+                if task.get('project'):
+                    project = task.get('project')
+
+                    self.project_tasks.push_back_task(project, task_card)
 
         tasks['To Do'] = important_tasks + tasks['To Do']
 
