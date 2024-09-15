@@ -105,6 +105,7 @@ class KanbanTxtViewer:
     win_height = 0
     win_width = 0
 
+    is_filters_visible = False 
 
     def __init__(self, file='', darkmode=False) -> None:
         self.darkmode = darkmode
@@ -415,24 +416,25 @@ class KanbanTxtViewer:
 
 
         # Prepare filters panel
-        self.filters_panel = tk.Frame(
+        self.filters_section = tk.Frame(
             self.content_frame, 
             bg=self.COLORS['main-background'], 
-            highlightbackground=self.COLORS['main-text'], 
-            highlightthickness=2
+            highlightbackground=self.COLORS['To Do-column'], 
+            highlightthickness=2,
+            highlightcolor=self.COLORS['To Do-column'],
         )
-        self.filters_panel.columnconfigure(0, weight=1)
-        self.filters_panel.columnconfigure(1, weight=1)
+        self.filters_section.columnconfigure(0, weight=1)
+        #self.filters_panel.columnconfigure(1, weight=1)
 
         filters_title = tk.Label(
-            self.filters_panel, 
+            self.filters_section, 
             text="Filters", 
             font=tkFont.nametofont('h2'),
             fg=self.COLORS['main-text'],
             bg=self.COLORS['main-background'],
             anchor=tk.W
         )
-        filters_title.grid(column=0, row=0, columnspan=2, sticky='we')
+        filters_title.grid(column=0, row=0, sticky=tk.EW, padx=10)
 
         self.toggle_filters_button = tk.Button(
             filters_title, 
@@ -441,23 +443,34 @@ class KanbanTxtViewer:
             bg=self.COLORS['main-background'],
             relief='flat',
             borderwidth=0,
+            highlightthickness=0,
             activebackground=self.COLORS['done-card-background'],
             activeforeground=self.COLORS['main-text'],
-            font=tkFont.nametofont('main')
+            font=tkFont.nametofont('main'),
+            command=self.on_toggle_filters_button_pressed
             )
         self.toggle_filters_button.pack(side='right', padx=5, pady=5)
 
+        self.filters_lists_frame = tk.Frame(
+            self.filters_section,
+            bg=self.COLORS['main-background']
+        )
+
+        # prepare space for the filters list and hide it
+        self.filters_lists_frame.grid(column=0, row=1) 
+        self.filters_lists_frame.grid_remove()
+        
         project_filters_title = tk.Label(
-            self.filters_panel,
+            self.filters_lists_frame,
             font=tkFont.nametofont("main"),
             fg=self.COLORS['project'],
-            bg=self.COLORS['done-card-background'],
+            bg=self.COLORS['main-background'],
             text="+projects"
         )
-        project_filters_title.grid(column=0, row=1)
+        project_filters_title.grid(column=0, row=0)
 
         self.project_filters_list = tk.Listbox(
-            self.filters_panel,
+            self.filters_lists_frame,
             bg=self.COLORS['done-card-background'],
             fg=self.COLORS['main-text'],
             font=tkFont.nametofont('main'),
@@ -469,7 +482,7 @@ class KanbanTxtViewer:
             highlightthickness=0
         )
         self.project_filters_list.grid(
-            column=0, row=2, pady=5
+            column=0, row=1, pady=5
         )
         self.project_tasks = self.TaggedTaskList(self.project_filters_list)
 
@@ -480,7 +493,7 @@ class KanbanTxtViewer:
         self.progress_bar.pack(side='top', fill='x', padx=10, pady=10)
         self.progress_bars = {}
 
-        self.filters_panel.pack(fill='x', padx=10, pady=10)
+        self.filters_section.pack(fill='x', padx=10, pady=10)
 
         # scrollable frame is packed here to be under the progress bar 
         self.scrollable_frame.pack(fill='both', expand=True)
@@ -1143,6 +1156,16 @@ class KanbanTxtViewer:
         for widget in widgets_to_show:
             widget.pack(padx=0, pady=(0, 10), side="top", fill='x', expand=1, anchor=tk.NW)
 
+    
+    def on_toggle_filters_button_pressed(self):
+        if self.is_filters_visible:
+            self.filters_lists_frame.grid_remove()
+            self.is_filters_visible = False
+            self.toggle_filters_button.configure(text='▼')
+        else:
+            self.filters_lists_frame.grid()
+            self.is_filters_visible = True
+            self.toggle_filters_button.configure(text='▲')
 
 def main(args):
     app = KanbanTxtViewer(args.file, args.darkmode)
