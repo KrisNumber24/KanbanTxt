@@ -71,6 +71,69 @@ class KanbanTxtViewer:
 
     FONTS = []
 
+    class TaggedTaskList:
+        '''
+        An object that manage a list of tags and stores tasks that have specific
+        tags. It has a listbox attached to it so this widget is updated when a new
+        tag is found or it is needed to reset the tags list.
+        '''
+        attached_listBox = None
+        tags = []
+        tagged_tasks = {}
+        filters = []
+
+        def __init__(self, listBox) -> None:
+            self.attached_listBox = listBox
+
+        def create_tag(self, name):
+            if name in self.tags:
+                return
+            
+            self.tags.append(name)
+            self.tagged_tasks[name] = []
+            self.attached_listBox.insert(tk.END, name)
+
+            if name in self.filters:
+                index = len(self.tags)
+                self.attached_listBox.selection_set(tk.END)
+                self.attached_listBox.activate(tk.END)
+
+        
+        def push_back_task(self, tag, task_widget):
+            self.create_tag(tag)
+            self.tagged_tasks[tag].append(task_widget)
+        
+        def clear(self):
+            self.tags.clear()
+            self.tagged_tasks.clear()
+            self.attached_listBox.delete(0, tk.END)
+
+        def get_filtered_tasks(self):
+            tasks_to_show = []
+            tasks_to_hide = []
+
+            for tag in self.tagged_tasks.keys():
+                if tag in self.filters:
+                    tasks_to_show += self.tagged_tasks[tag]
+                else:
+                    tasks_to_hide += self.tagged_tasks[tag]
+
+            return {
+                'to_show': tasks_to_show,
+                'to_hide': tasks_to_hide
+                }
+
+    # ====== END TaggedTaskList ======
+
+    sorted_tasks = {}
+    sorted_tasks['project'] = None
+    sorted_tasks['context'] = None
+
+    win_height = 0
+    win_width = 0
+
+    is_filters_visible = False
+
 
     def __init__(self, file='', darkmode=False) -> None:
         self.darkmode = darkmode
@@ -334,52 +397,179 @@ class KanbanTxtViewer:
 
     def draw_content_frame(self):
         # Create content view that will display kanban
+        self.content_frame = tk.Frame(self.main_window, bg=self.COLORS['main-background'])
+        self.content_frame.grid(row=0, column=1, sticky=tk.NSEW, padx=10, pady=10)
+        
+        # Give more space to the kanban view
+        self.main_window.grid_columnconfigure(1, weight=6)
 
+        
         # SCROLLABLE CANVAS
+        self.scrollable_frame = tk.Frame(self.content_frame, bg=self.COLORS['main-background'])
+
+        scrollbar = tk.Scrollbar(
+            self.scrollable_frame, 
+            orient="vertical", 
+        )
+        scrollbar.grid(column=1, row=0, sticky='ns')
+
         # Use canvas to make content view scrollable
         self.content_canvas = tk.Canvas(
-            self.main_window, 
+            self.scrollable_frame, 
             bg=self.COLORS['main-background'], 
             bd=0, 
             highlightthickness=0, 
             relief=tk.FLAT
         )
-        self.content_canvas.grid(row=0, column=1, sticky=tk.NSEW, padx=10, pady=10)
-        
-        # Give more space to the kanban view
-        self.main_window.grid_columnconfigure(1, weight=6)
+        self.content_canvas.grid(column=0, row=0, sticky='nsew')
 
         # The frame inside the canvas. It manage the widget displayed inside the canvas
-        self.content_frame = tk.Frame(self.content_canvas, bg=self.COLORS['main-background'])
+        self.canvas_frame = tk.Frame(self.scrollable_frame, bg=self.COLORS['main-background'])
 
+        # Frame containing the kanban
+        self.kanban_frame = tk.Frame(self.canvas_frame, bg=self.COLORS['main-background'])
+        self.kanban_frame.pack(fill='x')
 
-        content_scrollbar = tk.Scrollbar(
-            self.main_window, 
-            orient="vertical", 
-            command=self.content_canvas.yview
-        )
-        content_scrollbar.grid(row=0, column=2, sticky='ns')
-        
-        self.canvas_frame = self.content_canvas.create_window(
-            (0, 0), window=self.content_frame, anchor="nw")
+        self.canvas_frame_id = self.content_canvas.create_window(
+            (0, 0), window=self.canvas_frame, anchor="nw")
 
         # Attach the scroll bar position to the visible region of the canvas
-        self.content_canvas.configure(yscrollcommand=content_scrollbar.set)
+        self.scrollable_frame.grid_rowconfigure(0, weight=1)
+        self.scrollable_frame.grid_columnconfigure(0, weight=1)
+        scrollbar.configure(command=self.content_canvas.yview)
+        self.content_canvas.configure(yscrollcommand=scrollbar.set)
+        self.canvas_frame.configure()
+
         # END SCROLLABLE CANVAS
+
+
+        # Prepare filters panel
+        self.filters_section = tk.Frame(
+            self.content_frame, 
+            bg=self.COLORS['main-background'], 
+            highlightbackground=self.COLORS['To Do-column'], 
+            highlightthickness=2,
+            highlightcolor=self.COLORS['To Do-column'],
+        )
+        self.filters_section.columnconfigure(0, weight=1)
+        #self.filters_panel.columnconfigure(1, weight=1)
+
+        filters_title = tk.Label(
+            self.filters_section, 
+            text="Filters", 
+            font=tkFont.nametofont('h2'),
+            fg=self.COLORS['main-text'],
+            bg=self.COLORS['main-background'],
+            anchor=tk.W
+        )
+        filters_title.grid(column=0, row=0, sticky=tk.EW, padx=10)
+        filters_title.bind('<Button-1>', self.on_toggle_filters_button_pressed)
+
+        self.toggle_filters_button = tk.Button(
+            filters_title, 
+            text='▼', 
+            fg=self.COLORS['main-text'],
+            bg=self.COLORS['main-background'],
+            relief='flat',
+            borderwidth=0,
+            highlightthickness=0,
+            activebackground=self.COLORS['done-card-background'],
+            activeforeground=self.COLORS['main-text'],
+            font=tkFont.nametofont('main'),
+            command=self.on_toggle_filters_button_pressed
+            )
+        self.toggle_filters_button.pack(side='right', padx=5, pady=5)
+
+        # set button as active when the label is hovered
+        filters_title.bind("<Enter>", lambda event: self.toggle_filters_button.config(state="active"))
+        filters_title.bind("<Leave>", lambda event: self.toggle_filters_button.config(state="normal"))
+
+
+        
+        self.filters_lists_frame = tk.Frame(
+            self.filters_section,
+            bg=self.COLORS['main-background']
+        )
+
+        # prepare space for the filters list and hide it
+        self.filters_lists_frame.grid(column=0, row=1) 
+        self.filters_lists_frame.grid_remove()
+        
+        project_filters_title = tk.Label(
+            self.filters_lists_frame,
+            font=tkFont.nametofont("main"),
+            fg=self.COLORS['project'],
+            bg=self.COLORS['main-background'],
+            text="+projects"
+        )
+        project_filters_title.grid(column=0, row=0)
+
+        self.project_filters_list = tk.Listbox(
+            self.filters_lists_frame,
+            bg=self.COLORS['done-card-background'],
+            fg=self.COLORS['main-text'],
+            font=tkFont.nametofont('main'),
+            selectmode='multiple',
+            selectbackground=self.COLORS['project'],
+            selectforeground=self.COLORS['main-background'],
+            selectborderwidth=0,
+            border=0,
+            highlightthickness=0,
+            exportselection=False
+        )
+        self.project_filters_list.grid(
+            column=0, row=1, pady=5
+        )
+        self.sorted_tasks['project'] = self.TaggedTaskList(self.project_filters_list)
+
+        self.project_filters_list.bind('<<ListboxSelect>>', self.on_project_filters_selected)
+        
+        # adds listbox for context filters
+        context_filters_title = tk.Label(
+            self.filters_lists_frame,
+            font=tkFont.nametofont("main"),
+            fg=self.COLORS['context'],
+            bg=self.COLORS['main-background'],
+            text="@contexts"
+        )
+        context_filters_title.grid(column=1, row=0)
+
+
+        self.context_filters_list = tk.Listbox(
+            self.filters_lists_frame,
+            bg=self.COLORS['done-card-background'],
+            fg=self.COLORS['main-text'],
+            font=tkFont.nametofont('main'),
+            selectmode='multiple',
+            selectbackground=self.COLORS['context'],
+            selectforeground=self.COLORS['main-background'],
+            selectborderwidth=0,
+            border=0,
+            highlightthickness=0,
+            exportselection=False
+        )
+        self.context_filters_list.grid(
+            column=1, row=1, pady=5
+        )
+        self.sorted_tasks['context'] = self.TaggedTaskList(self.context_filters_list)
+
+        self.context_filters_list.bind('<<ListboxSelect>>', self.on_context_filters_selected)
+
 
         # Prepare progress bars and kanban itself
         self.progress_bar = tk.Frame(self.content_frame, height=15, bg=self.COLORS['done-card-background'])
         self.progress_bar.pack(side='top', fill='x', padx=10, pady=10)
         self.progress_bars = {}
 
+        self.filters_section.pack(fill='x', padx=10, pady=10)
+
+        # scrollable frame is packed here to be under the progress bar 
+        self.scrollable_frame.pack(fill='both', expand=True)
+
         # position of the current sub progress bar
         sub_bar_pos = 0
         # number of the current column in the tkinter grid
         column_number = 0
-
-        # Frame containing the kanban
-        self.kanban_frame = tk.Frame(self.content_frame, bg=self.COLORS['main-background'])
-        self.kanban_frame.pack(fill='both')
 
         # Create each column and its associated progress bar
         for key, column in self.ui_columns.items():
@@ -445,8 +635,8 @@ class KanbanTxtViewer:
 
         # Allow to bind the mousewheel event to the canvas and scroll through it
         # with the wheel
-        self.content_canvas.bind('<Enter>', self.bind_to_mousewheel)
-        self.content_canvas.bind('<Leave>', self.unbind_to_mousewheel)
+        self.kanban_frame.bind('<Enter>', self.bind_to_mousewheel)
+        self.kanban_frame.bind('<Leave>', self.unbind_to_mousewheel)
 
         # Move the scroll region according to the scroll
         self.content_frame.bind(
@@ -511,6 +701,10 @@ class KanbanTxtViewer:
 
         important_tasks = []
 
+        # reset the task lists filtered by projects
+        self.sorted_tasks['project'].clear()
+        self.sorted_tasks['context'].clear()
+        
         # Erase the columns content
         for ui_column_name, ui_column in self.ui_columns.items():
             ui_column.content.pack_forget()
@@ -580,7 +774,7 @@ class KanbanTxtViewer:
                 if task.get('is_important', False):
                     card_parent = important_frame
 
-                self.draw_card(
+                task_card = self.draw_card(
                     card_parent,
                     task.get('subject', '???'),
                     card_bg,
@@ -593,6 +787,16 @@ class KanbanTxtViewer:
                     state=category,
                     name="task#" + str(index + 1)
                 )
+
+                # register tagged tasks for each tag type (project, context)
+                for filter_name in self.sorted_tasks:
+                    if task.get(filter_name):
+                        project = task.get(filter_name)
+
+                        self.sorted_tasks[filter_name].push_back_task(project, task_card)
+                
+                    else:
+                        self.sorted_tasks[filter_name].push_back_task(None, task_card)
 
         tasks['To Do'] = important_tasks + tasks['To Do']
 
@@ -635,7 +839,9 @@ class KanbanTxtViewer:
 
         self.main_window.update()
 
-        return tasks;
+        self.filter_tasks()
+
+        return tasks
 
 
     def draw_card(
@@ -815,13 +1021,15 @@ class KanbanTxtViewer:
         self.content_canvas.itemconfig(self.canvas_frame, width = canvas_width)
                 
     def hide_content(self):
-        self.progress_bar.pack_forget()
-        self.kanban_frame.pack_forget()
+        # self.progress_bar.pack_forget()
+        # self.kanban_frame.pack_forget()
+        pass
 
 
     def display_content(self):
-        self.progress_bar.pack(side='top', fill='x', padx=10, pady=10)
-        self.kanban_frame.pack(fill='both')
+        # self.progress_bar.pack(side='top', fill='x', padx=10, pady=10)
+        # self.kanban_frame.pack(fill='both')
+        pass
 
 
     def on_card_width_changed(self, event):
@@ -849,6 +1057,9 @@ class KanbanTxtViewer:
 
     def scroll(self, event):
         """Scroll through the kanban frame"""
+        if self.content_canvas.winfo_height() > self.canvas_frame.winfo_height():
+            return
+
         self.content_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
 
@@ -937,6 +1148,12 @@ class KanbanTxtViewer:
     
 
     def on_window_resize(self, event):
+        if self.win_width == event.width and self.win_height == event.height:
+            return
+
+        self.win_width = event.width
+        self.win_height = event.height
+
         self.hide_content()
         
         if self._after_id:
@@ -945,8 +1162,9 @@ class KanbanTxtViewer:
         self._after_id = self.main_window.after(100, self.update_canvas, event)
 
 
+
     def update_canvas(self, event):
-        self.content_canvas.itemconfig(self.canvas_frame, width = event.width)
+        self.content_canvas.itemconfig(self.canvas_frame_id, width = event.width)
 
         if event.width < 700:
             index = 1
@@ -965,8 +1183,10 @@ class KanbanTxtViewer:
         self.display_content()
         pass
 
+
     def return_pressed(self, event=None):
         self.main_window.after(100, self.update_editor_line_colors)
+
 
     def update_editor_line_colors(self, event=None):
         nb_line = int(self.text_editor.index('end-1c').split('.')[0])
@@ -981,7 +1201,66 @@ class KanbanTxtViewer:
         searched_task_line = event.widget.winfo_name().replace("task#", "")
         self.text_editor.mark_set('insert', searched_task_line + ".0")
         self.text_editor.see('insert')
+    
 
+    def on_project_filters_selected(self, event):
+        selected_idx = event.widget.curselection()
+
+        if len(selected_idx) == 0:
+            selected_idx = range(0, len(self.sorted_tasks['project'].tags))
+
+        self.sorted_tasks['project'].filters = []
+        for i in selected_idx:
+            self.sorted_tasks['project'].filters.append(event.widget.get(i))
+
+        self.filter_tasks()
+
+    def on_context_filters_selected(self, event):
+        selected_idx = event.widget.curselection()
+
+        if len(selected_idx) == 0:
+            selected_idx = range(0, len(self.sorted_tasks['context'].tags))
+
+        self.sorted_tasks['context'].filters = []
+        for i in selected_idx:
+            self.sorted_tasks['context'].filters.append(event.widget.get(i))
+
+        self.filter_tasks()
+
+
+            
+    def filter_tasks(self):
+        widgets_to_hide = []
+        widgets_to_show = []
+
+        for tasks_list in self.sorted_tasks.values():
+            if len(tasks_list.filters) > 0:
+                filtered_tasks = tasks_list.get_filtered_tasks()
+
+                # Hide all the tasks that don't have all the values filtered
+                widgets_to_hide += filtered_tasks['to_hide']
+
+                if len(widgets_to_show) < 1:
+                    widgets_to_show = filtered_tasks['to_show']
+                elif len(filtered_tasks['to_show']) > 0:
+                    widgets_to_show = [value for value in widgets_to_show if value in filtered_tasks['to_show']]
+
+        for widget in widgets_to_hide:
+            widget.pack_forget()
+        
+        for widget in widgets_to_show:
+            widget.pack(padx=0, pady=(0, 10), side="top", fill='x', expand=1, anchor=tk.NW)
+
+    
+    def on_toggle_filters_button_pressed(self, event=None):
+        if self.is_filters_visible:
+            self.filters_lists_frame.grid_remove()
+            self.is_filters_visible = False
+            self.toggle_filters_button.configure(text='▼')
+        else:
+            self.filters_lists_frame.grid()
+            self.is_filters_visible = True
+            self.toggle_filters_button.configure(text='▲')
 
 def main(args):
     app = KanbanTxtViewer(args.file, args.darkmode)
