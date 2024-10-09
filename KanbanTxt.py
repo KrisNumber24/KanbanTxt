@@ -80,6 +80,7 @@ class KanbanTxtViewer:
         attached_listBox = None
         tags = []
         tagged_tasks = {}
+        filters = []
 
         def __init__(self, listBox) -> None:
             self.attached_listBox = listBox
@@ -98,14 +99,33 @@ class KanbanTxtViewer:
             self.tags.clear()
             self.tagged_tasks.clear()
             self.attached_listBox.delete(0, tk.END)
-    
-    project_tasks = None
 
+        def get_filtered_tasks(self):
+            tasks_to_show = []
+            tasks_to_hide = []
+
+            for tag in self.tagged_tasks.keys():
+                if tag in self.filters:
+                    tasks_to_show += self.tagged_tasks[tag]
+                else:
+                    tasks_to_hide += self.tagged_tasks[tag]
+
+            return {
+                'to_show': tasks_to_show,
+                'to_hide': tasks_to_hide
+                }
+
+    # ====== END TaggedTaskList ======
+
+    sorted_tasks = {}
+    sorted_tasks['project'] = None
+    sorted_tasks['context'] = None
 
     win_height = 0
     win_width = 0
 
-    is_filters_visible = False 
+    is_filters_visible = False
+
 
     def __init__(self, file='', darkmode=False) -> None:
         self.darkmode = darkmode
@@ -479,14 +499,47 @@ class KanbanTxtViewer:
             selectforeground=self.COLORS['main-background'],
             selectborderwidth=0,
             border=0,
-            highlightthickness=0
+            highlightthickness=0,
+            exportselection=False
         )
         self.project_filters_list.grid(
             column=0, row=1, pady=5
         )
-        self.project_tasks = self.TaggedTaskList(self.project_filters_list)
+        self.sorted_tasks['project'] = self.TaggedTaskList(self.project_filters_list)
 
         self.project_filters_list.bind('<<ListboxSelect>>', self.on_project_filters_selected)
+        
+        # adds listbox for context filters
+        context_filters_title = tk.Label(
+            self.filters_lists_frame,
+            font=tkFont.nametofont("main"),
+            fg=self.COLORS['context'],
+            bg=self.COLORS['main-background'],
+            text="@contexts"
+        )
+        context_filters_title.grid(column=1, row=0)
+
+
+        self.context_filters_list = tk.Listbox(
+            self.filters_lists_frame,
+            bg=self.COLORS['done-card-background'],
+            fg=self.COLORS['main-text'],
+            font=tkFont.nametofont('main'),
+            selectmode='multiple',
+            selectbackground=self.COLORS['context'],
+            selectforeground=self.COLORS['main-background'],
+            selectborderwidth=0,
+            border=0,
+            highlightthickness=0,
+            exportselection=False
+        )
+        self.context_filters_list.grid(
+            column=1, row=1, pady=5
+        )
+        self.sorted_tasks['context'] = self.TaggedTaskList(self.context_filters_list)
+
+        self.context_filters_list.bind('<<ListboxSelect>>', self.on_context_filters_selected)
+
 
         # Prepare progress bars and kanban itself
         self.progress_bar = tk.Frame(self.content_frame, height=15, bg=self.COLORS['done-card-background'])
@@ -634,8 +687,9 @@ class KanbanTxtViewer:
         important_tasks = []
 
         # reset the task lists filtered by projects
-        self.project_tasks.clear()
-
+        self.sorted_tasks['project'].clear()
+        self.sorted_tasks['context'].clear()
+        
         # Erase the columns content
         for ui_column_name, ui_column in self.ui_columns.items():
             ui_column.content.pack_forget()
@@ -719,14 +773,15 @@ class KanbanTxtViewer:
                     name="task#" + str(index + 1)
                 )
 
-                # register the task in the projects dictionary
-                if task.get('project'):
-                    project = task.get('project')
+                # register tagged tasks for each tag type (project, context)
+                for filter_name in self.sorted_tasks:
+                    if task.get(filter_name):
+                        project = task.get(filter_name)
 
-                    self.project_tasks.push_back_task(project, task_card)
+                        self.sorted_tasks[filter_name].push_back_task(project, task_card)
                 
-                else:
-                    self.project_tasks.push_back_task(None, task_card)
+                    else:
+                        self.sorted_tasks[filter_name].push_back_task(None, task_card)
 
         tasks['To Do'] = important_tasks + tasks['To Do']
 
@@ -1135,20 +1190,42 @@ class KanbanTxtViewer:
         selected_idx = event.widget.curselection()
 
         if len(selected_idx) == 0:
-            selected_idx = range(0, len(self.project_tasks.tags))
+            selected_idx = range(0, len(self.sorted_tasks['project'].tags))
 
-        selected_projects = []
+        self.sorted_tasks['project'].filters = []
         for i in selected_idx:
-            selected_projects.append(event.widget.get(i))
-        
+            self.sorted_tasks['project'].filters.append(event.widget.get(i))
+
+        self.filter_tasks()
+
+    def on_context_filters_selected(self, event):
+        selected_idx = event.widget.curselection()
+
+        if len(selected_idx) == 0:
+            selected_idx = range(0, len(self.sorted_tasks['context'].tags))
+
+        self.sorted_tasks['context'].filters = []
+        for i in selected_idx:
+            self.sorted_tasks['context'].filters.append(event.widget.get(i))
+
+        self.filter_tasks()
+
+
+            
+    def filter_tasks(self):
         widgets_to_hide = []
         widgets_to_show = []
 
-        for key, tasks in self.project_tasks.tagged_tasks.items():
-            if not key in selected_projects:
-                widgets_to_hide += tasks
-            else:
-                widgets_to_show += tasks
+        for tasks_list in self.sorted_tasks.values():
+            filtered_tasks = tasks_list.get_filtered_tasks()
+
+            # Hide all the tasks that don't have all the values filtered
+            widgets_to_hide += filtered_tasks['to_hide']
+            
+            if len(widgets_to_show) < 1:
+                widgets_to_show = filtered_tasks['to_show']
+            elif len(filtered_tasks['to_show']) > 0:
+                widgets_to_show = [value for value in widgets_to_show if value in filtered_tasks['to_show']]
         
         for widget in widgets_to_hide:
             widget.pack_forget()
