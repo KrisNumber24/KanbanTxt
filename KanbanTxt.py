@@ -86,10 +86,18 @@ class KanbanTxtViewer:
             self.attached_listBox = listBox
 
         def create_tag(self, name):
-            if not name in self.tags:
-                self.tags.append(name)
-                self.tagged_tasks[name] = []
-                self.attached_listBox.insert(tk.END, name)
+            if name in self.tags:
+                return
+            
+            self.tags.append(name)
+            self.tagged_tasks[name] = []
+            self.attached_listBox.insert(tk.END, name)
+
+            if name in self.filters:
+                index = len(self.tags)
+                self.attached_listBox.selection_set(tk.END)
+                self.attached_listBox.activate(tk.END)
+
         
         def push_back_task(self, tag, task_widget):
             self.create_tag(tag)
@@ -824,6 +832,8 @@ class KanbanTxtViewer:
 
         self.main_window.update()
 
+        self.filter_tasks()
+
         return tasks
 
 
@@ -1217,16 +1227,17 @@ class KanbanTxtViewer:
         widgets_to_show = []
 
         for tasks_list in self.sorted_tasks.values():
-            filtered_tasks = tasks_list.get_filtered_tasks()
+            if len(tasks_list.filters) > 0:
+                filtered_tasks = tasks_list.get_filtered_tasks()
 
-            # Hide all the tasks that don't have all the values filtered
-            widgets_to_hide += filtered_tasks['to_hide']
-            
-            if len(widgets_to_show) < 1:
-                widgets_to_show = filtered_tasks['to_show']
-            elif len(filtered_tasks['to_show']) > 0:
-                widgets_to_show = [value for value in widgets_to_show if value in filtered_tasks['to_show']]
-        
+                # Hide all the tasks that don't have all the values filtered
+                widgets_to_hide += filtered_tasks['to_hide']
+
+                if len(widgets_to_show) < 1:
+                    widgets_to_show = filtered_tasks['to_show']
+                elif len(filtered_tasks['to_show']) > 0:
+                    widgets_to_show = [value for value in widgets_to_show if value in filtered_tasks['to_show']]
+
         for widget in widgets_to_hide:
             widget.pack_forget()
         
