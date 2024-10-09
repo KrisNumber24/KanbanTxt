@@ -463,6 +463,7 @@ class KanbanTxtViewer:
             anchor=tk.W
         )
         filters_title.grid(column=0, row=0, sticky=tk.EW, padx=10)
+        filters_title.bind('<Button-1>', self.on_toggle_filters_button_pressed)
 
         self.toggle_filters_button = tk.Button(
             filters_title, 
@@ -479,6 +480,12 @@ class KanbanTxtViewer:
             )
         self.toggle_filters_button.pack(side='right', padx=5, pady=5)
 
+        # set button as active when the label is hovered
+        filters_title.bind("<Enter>", lambda event: self.toggle_filters_button.config(state="active"))
+        filters_title.bind("<Leave>", lambda event: self.toggle_filters_button.config(state="normal"))
+
+
+        
         self.filters_lists_frame = tk.Frame(
             self.filters_section,
             bg=self.COLORS['main-background']
@@ -1245,7 +1252,7 @@ class KanbanTxtViewer:
             widget.pack(padx=0, pady=(0, 10), side="top", fill='x', expand=1, anchor=tk.NW)
 
     
-    def on_toggle_filters_button_pressed(self):
+    def on_toggle_filters_button_pressed(self, event=None):
         if self.is_filters_visible:
             self.filters_lists_frame.grid_remove()
             self.is_filters_visible = False
