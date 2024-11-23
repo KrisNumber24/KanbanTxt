@@ -73,17 +73,16 @@ class KanbanTxtViewer:
 
     class TaggedTaskList:
         '''
-        An object that manage a list of tags and stores tasks that have specific
-        tags. It has a listbox attached to it so this widget is updated when a new
+        An object that manage a list of tags and stores tasks sorted by a specific
+        tag. It has a listbox attached to it so this widget is updated when a new
         tag is found or it is needed to reset the tags list.
         '''
-        attached_listBox = None
-        tags = []
-        tagged_tasks = {}
-        filters = []
 
         def __init__(self, listBox) -> None:
             self.attached_listBox = listBox
+            self.tags = []
+            self.tagged_tasks = {}
+            self.filters = []
 
         def create_tag(self, name):
             if name in self.tags:
