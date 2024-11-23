@@ -84,6 +84,9 @@ class KanbanTxtViewer:
             self.tagged_tasks = {}
             self.filters = []
 
+            # Create a default tag for tasks with no tag
+            self.create_tag("< uncategorized >")
+
         def create_tag(self, name):
             if name in self.tags:
                 return
@@ -106,6 +109,9 @@ class KanbanTxtViewer:
             self.tags.clear()
             self.tagged_tasks.clear()
             self.attached_listBox.delete(0, tk.END)
+            
+            # Create a default tag for tasks with no tag
+            self.create_tag("< uncategorized >")
 
         def get_filtered_tasks(self):
             tasks_to_show = []
@@ -801,7 +807,7 @@ class KanbanTxtViewer:
                         self.sorted_tasks[filter_name].push_back_task(project, task_card)
                 
                     else:
-                        self.sorted_tasks[filter_name].push_back_task(None, task_card)
+                        self.sorted_tasks[filter_name].push_back_task('< uncategorized >', task_card)
 
         tasks['To Do'] = important_tasks + tasks['To Do']
 
