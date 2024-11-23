@@ -129,8 +129,10 @@ class KanbanTxtViewer:
     sorted_tasks['project'] = None
     sorted_tasks['context'] = None
 
-    win_height = 0
-    win_width = 0
+    # Variables to store the size of the canvas and avoid to recompute its 
+    # content size and placing if it not necessary 
+    canvas_height = 0
+    canvas_width = 0
 
     is_filters_visible = False
 
@@ -155,6 +157,10 @@ class KanbanTxtViewer:
 
         
     def draw_ui(self, window_width, window_height, window_x, window_y):
+        # Initialize some states
+        self.canvas_width = 0
+        self.canvas_height = 0
+        
         # Define theme
         dark_option = 'LIGHT_COLORS'
         if self.darkmode: 
@@ -647,7 +653,7 @@ class KanbanTxtViewer:
         )
 
         # resize kanban frame when window is resied
-        self.content_canvas.bind('<Configure>', self.on_window_resize)
+        self.content_canvas.bind('<Configure>', self.on_canvas_resized)
     
 
     def create_button(
@@ -1147,26 +1153,26 @@ class KanbanTxtViewer:
         self.text_editor.insert("insert linestart +%dc" % (insert_index), str(self.current_date) + " ")
     
 
-    def on_window_resize(self, event):
-        if self.win_width == event.width and self.win_height == event.height:
+    def on_canvas_resized(self, event):
+        if self.canvas_width == event.width and self.canvas_height == event.height:
             return
 
-        self.win_width = event.width
-        self.win_height = event.height
+        self.canvas_width = event.width
+        self.canvas_height = event.height
 
         self.hide_content()
         
         if self._after_id:
             self.main_window.after_cancel(self._after_id)
         
-        self._after_id = self.main_window.after(100, self.update_canvas, event)
+        self._after_id = self.main_window.after(100, self.update_canvas, event.width)
 
 
 
-    def update_canvas(self, event):
-        self.content_canvas.itemconfig(self.canvas_frame_id, width = event.width)
+    def update_canvas(self, canvas_width):
+        self.content_canvas.itemconfig(self.canvas_frame_id, width = canvas_width)
 
-        if event.width < 700:
+        if canvas_width < 700:
             index = 1
             for column_name, column in self.ui_columns.items():
                 column.grid(
